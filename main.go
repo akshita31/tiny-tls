@@ -33,6 +33,7 @@ func (session *Session) ReceiveHTTPResponse() []byte {
 
 func (session *Session) connect(domainName string) {
 	session.SendClientHello(domainName)
+	fmt.Println("sent client hello")
 	session.GetServerHello()
 	session.MakeHandshakeKeys()
 	session.ParseServerHandshake()
@@ -61,6 +62,8 @@ func (session *Session) SendClientHello(domain string) {
 func (session *Session) GetServerHello() {
 	conn := session.Conn
 	record := readRecord(conn)
+	println(len(record))
+	println(record.Type())
 	if record.Type() != 0x16 {
 		panic("expected server hello")
 	}

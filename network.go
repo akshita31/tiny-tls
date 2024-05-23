@@ -4,14 +4,30 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"syscall"
+	"time"
 )
 
 func send(conn io.Writer, buf []byte) {
-	n, err := conn.Write(buf)
+	l := len(buf)
+	mid := (l + 1) / 2
+	n, err := conn.Write(buf[0:mid])
+	time.Sleep(200 * time.Millisecond)
+	println("Sent bytes: ", n)
 	if err != nil {
 		panic(err)
 	}
-	if n != len(buf) {
+	if n != mid {
+		panic("didn't send all bytes")
+	}
+
+	n, err = conn.Write(buf[mid:])
+
+	println("Sent bytes: ", n)
+	if err != nil {
+		panic(err)
+	}
+	if n != l-mid {
 		panic("didn't send all bytes")
 	}
 }
@@ -48,9 +64,25 @@ func readUpto(length int, reader io.Reader) []byte {
 }
 
 func connect() Session {
-	conn, err := net.Dial("tcp", "jvns.ca:443")
+	receive_buffer_size := 2
+	dialer := &net.Dialer{
+		Control: func(network, address string, conn syscall.RawConn) error {
+			var operr error
+			if err := conn.Control(func(fd uintptr) {
+				operr = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_SNDBUF, receive_buffer_size)
+				syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_RCVBUF, receive_buffer_size)
+				println("SetsockoptInt: ", operr)
+			}); err != nil {
+				return err
+			}
+			return operr
+		},
+	}
+
+	conn, err := dialer.Dial("tcp", "localhost:10000")
 	if err != nil {
 		panic(err)
 	}
+
 	return Session{Conn: conn}
 }
